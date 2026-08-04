@@ -1,0 +1,85 @@
+# Production stack for a single EU VPS (docs/17).
+# Caddy terminates TLS; internal network only. Images are built from source.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${IIQ_PG_USER:-invoiceiq}
+      POSTGRES_PASSWORD: ${IIQ_PG_PASSWORD:?set IIQ_PG_PASSWORD}
+      POSTGRES_DB: ${IIQ_PG_DB:-invoiceiq}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/docker/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${IIQ_PG_USER:-invoiceiq}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${IIQ_REDIS_PASSWORD:?set IIQ_REDIS_PASSWORD}"]
+    volumes:
+      - redisdata:/data
+
+  api:
+    build:
+      context: ..
+      dockerfile: infra/docker/backend.Dockerfile
+    restart: unless-stopped
+    environment: &appenv
+      IIQ_APP_ENV: production
+      IIQ_DATABASE_URL: postgresql+psycopg://${IIQ_PG_USER:-invoiceiq}:${IIQ_PG_PASSWORD}@postgres:5432/${IIQ_PG_DB:-invoiceiq}
+      IIQ_REDIS_URL: redis://:${IIQ_REDIS_PASSWORD}@redis:6379/0
+      IIQ_SECRET_KEY: ${IIQ_SECRET_KEY:?set IIQ_SECRET_KEY}
+      IIQ_ENCRYPTION_KEY: ${IIQ_ENCRYPTION_KEY:?set IIQ_ENCRYPTION_KEY}
+      IIQ_LLM_DEFAULT_PROVIDER: ${IIQ_LLM_DEFAULT_PROVIDER:-mistral}
+      IIQ_LLM_API_KEY: ${IIQ_LLM_API_KEY:-}
+      IIQ_STORAGE_BACKEND: ${IIQ_STORAGE_BACKEND:-s3}
+      IIQ_CORS_ORIGINS: ${IIQ_CORS_ORIGINS:-https://app.invoiceiq.example}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: ["sh", "-c", "alembic upgrade head && uvicorn invoiceiq.main:app --host 0.0.0.0 --port 8000 --workers 2"]
+
+  worker:
+    build:
+      context: ..
+      dockerfile: infra/docker/worker.Dockerfile
+    restart: unless-stopped
+    environment: *appenv
+    depends_on:
+      api:
+        condition: service_started
+    command: ["celery", "-A", "invoiceiq.workers.app:celery_app", "worker", "--loglevel=info", "--concurrency=2"]
+
+  web:
+    build:
+      context: ..
+      dockerfile: infra/docker/web.Dockerfile
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - web
+
+volumes:
+  pgdata:
+  redisdata:
+  caddy_data:
+  caddy_config:

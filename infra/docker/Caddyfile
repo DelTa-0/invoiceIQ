@@ -1,0 +1,12 @@
+# Replace app.invoiceiq.example with the real domain.
+app.invoiceiq.example {
+    encode gzip
+
+    @api path /api/* /v1/* /healthz
+    handle @api {
+        reverse_proxy api:8000
+    }
+    handle {
+        reverse_proxy web:3000
+    }
+}

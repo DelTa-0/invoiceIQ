@@ -1,0 +1,32 @@
+# Local development stack — only the infrastructure we need in Docker.
+# Next.js and FastAPI run on the host (hot reload); Postgres + Redis here.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: invoiceiq-pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: invoiceiq
+      POSTGRES_PASSWORD: invoiceiq
+      POSTGRES_DB: invoiceiq
+    ports:
+      # Host 5433: the dev machine already has a native Postgres on 5432.
+      - "5433:5432"
+    volumes:
+      - invoiceiq_pgdata:/var/lib/postgresql/data
+      - ./infra/docker/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+
+  redis:
+    image: redis:7-alpine
+    container_name: invoiceiq-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - invoiceiq_redis:/data
+
+volumes:
+  invoiceiq_pgdata:
+  invoiceiq_redis:
