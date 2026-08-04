@@ -97,7 +97,6 @@ export async function login(payload: { email: string; password: string }): Promi
   });
   window.localStorage.setItem(TOKEN_KEY, tokens.access_token);
   const me = await request<{ org_id: string }>("/v1/auth/me");
-  window.localStorage.removeItem(TOKEN_KEY);
   return { access_token: tokens.access_token, token_type: "bearer", org_id: me.org_id };
 }
 
