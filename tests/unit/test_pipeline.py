@@ -11,20 +11,23 @@ import hashlib
 import io
 import uuid
 
+import pytest
 from invoiceiq.db import session_scope
 from invoiceiq.models import (
     ExtractionField,
     Invoice,
+    InvoicePage,
     LineItem,
     Organization,
     ProcessingJob,
     ValidationCheck,
 )
+from invoiceiq.ocr import paddle_available, tesseract_available
 from invoiceiq.storage import get_storage
 from invoiceiq.storage.local import build_key
 from invoiceiq.workers import run_pipeline
 
-from tests.helpers.pdf import GERMAN_INVOICE, make_blank_pdf, make_invoice_pdf
+from tests.helpers.pdf import GERMAN_INVOICE, make_invoice_pdf, make_scanned_pdf
 
 
 def _make_org() -> str:
@@ -111,10 +114,10 @@ def test_mismatched_total_flags_requires_review():
         assert checks["grand_total"].status == "fail"
 
 
-def test_no_text_layer_escalates_to_failed():
+def test_corrupt_pdf_escalates_to_failed():
     org_id = _make_org()
-    invoice_id, object_key = _upload(org_id, make_blank_pdf(), "scan.pdf")
-    run_pipeline(str(invoice_id), org_id, object_key, "scan.pdf")
+    invoice_id, object_key = _upload(org_id, b"not a pdf at all", "bad.pdf")
+    run_pipeline(str(invoice_id), org_id, object_key, "bad.pdf")
 
     with session_scope(org_id=org_id) as session:
         invoice = session.get(Invoice, invoice_id)
@@ -127,3 +130,24 @@ def test_no_text_layer_escalates_to_failed():
         )
         assert failed.status == "failed"
         assert failed.error == "OCR_NO_TEXT"
+
+
+def test_scanned_pdf_runs_scan_path():
+    if not (paddle_available() or tesseract_available()):
+        pytest.skip("no OCR engine installed")
+    org_id = _make_org()
+    invoice_id, object_key = _upload(org_id, make_scanned_pdf(), "scan.pdf")
+    run_pipeline(str(invoice_id), org_id, object_key, "scan.pdf")
+
+    with session_scope(org_id=org_id) as session:
+        invoice = session.get(Invoice, invoice_id)
+        assert invoice.status in ("completed", "requires_review")
+
+        pages = session.query(InvoicePage).filter_by(invoice_id=invoice_id).all()
+        assert pages, "scanned PDF should produce InvoicePage rows"
+        assert all(p.ocr_engine in ("paddleocr", "tesseract") for p in pages)
+
+        fields = {
+            f.field: f for f in session.query(ExtractionField).filter_by(invoice_id=invoice_id)
+        }
+        assert fields, "scan path should extract at least some fields"

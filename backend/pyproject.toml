@@ -24,12 +24,22 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+ocr = [
+  "paddlepaddle>=3.3",
+  "paddleocr>=3.0",
+  "PyMuPDF>=1.24",
+  "pytesseract>=0.3",
+]
 dev = [
   "pytest>=8",
   "pytest-cov>=5",
   "ruff>=0.5",
   "pyright>=1.1.370",
   "reportlab>=4.2",
+  "paddlepaddle>=3.3",
+  "paddleocr>=3.0",
+  "PyMuPDF>=1.24",
+  "pytesseract>=0.3",
 ]
 
 [build-system]

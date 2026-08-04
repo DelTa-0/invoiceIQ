@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     llm_default_provider: str = "mistral"
     llm_api_key: str = ""
 
+    # OCR (docs/14 §3). auto = PaddleOCR when installed, else Tesseract.
+    ocr_engine: str = "auto"  # auto | paddleocr | tesseract
+    ocr_min_score: float = 0.5  # below this a page escalates to the fallback engine
+
     # CORS (comma-separated; pydantic-settings parses list[str])
     cors_origins: list[str] = ["http://localhost:3000"]
 

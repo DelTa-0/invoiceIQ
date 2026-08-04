@@ -262,9 +262,10 @@ def ingest(invoice_id: str, org_id: str, object_key: str, filename: str) -> dict
         _set_invoice_status(invoice_id, org_id, "processing")
         data = get_storage().get(object_key)
         pages = normalize_document(data, filename)
-        if not any(p.text_layer for p in pages) or not any(p.blocks for p in pages):
-            raise OCRNoTextError("no text layer found (scanned?); OCR escalation is Phase 1 slice B")
+        if not any(p.blocks for p in pages):
+            raise OCRNoTextError("no readable text found in any page")
         _persist_pages(invoice_id, org_id, pages)
+        engines = {p.engine for p in pages}
         _append_job(
             invoice_id,
             org_id,
@@ -272,7 +273,7 @@ def ingest(invoice_id: str, org_id: str, object_key: str, filename: str) -> dict
             "done",
             payload={
                 "pages": [p.model_dump() for p in pages],
-                "engine": "pdfplumber",
+                "engine": ",".join(sorted(engines)),
                 "n_pages": len(pages),
             },
         )
