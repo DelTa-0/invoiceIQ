@@ -5,6 +5,8 @@ register -> login -> upload (eager pipeline) -> invoice visible with status.
 
 import io
 
+from tests.helpers.pdf import make_invoice_pdf
+
 
 def test_register_login_upload_smoke(client):
     r = client.post(
@@ -24,11 +26,11 @@ def test_register_login_upload_smoke(client):
     assert r.json()["email"] == "owner@example.com"
     assert r.json()["role"] == "owner"
 
-    fake_pdf = b"%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF"
+    real_pdf = make_invoice_pdf()
     r = client.post(
         "/v1/invoices",
         headers=headers,
-        files={"files": ("invoice-0001.pdf", io.BytesIO(fake_pdf), "application/pdf")},
+        files={"files": ("invoice-0001.pdf", io.BytesIO(real_pdf), "application/pdf")},
     )
     assert r.status_code == 202, r.text
     invoice_id = r.json()[0]["id"]
@@ -44,7 +46,7 @@ def test_register_login_upload_smoke(client):
     r = client.post(
         "/v1/invoices",
         headers=headers,
-        files={"files": ("invoice-0001.pdf", io.BytesIO(fake_pdf), "application/pdf")},
+        files={"files": ("invoice-0001.pdf", io.BytesIO(real_pdf), "application/pdf")},
     )
     assert r.status_code == 409, r.text
 

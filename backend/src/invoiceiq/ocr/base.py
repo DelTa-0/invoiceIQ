@@ -53,6 +53,14 @@ class OCRPage(BaseModel):
         return sum(b.conf for b in self.blocks) / len(self.blocks)
 
 
+class OCRNoTextError(Exception):
+    """Raised when a document yields no readable text (scanned/corrupt).
+
+    The pipeline maps this to `OCR_NO_TEXT` and (per docs/14 §7) marks the
+    invoice for VLM escalation or human review — never confident garbage.
+    """
+
+
 class OCREngine(Protocol):
     name: str
 

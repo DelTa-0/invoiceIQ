@@ -6,7 +6,7 @@ in the initial Alembic migration as database-specific steps.
 """
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from sqlalchemy import (
     JSON,
@@ -138,8 +138,8 @@ class Invoice(Base, TimestampMixin):
     country: Mapped[str | None] = mapped_column(String(2), nullable=True)
     currency: Mapped[str | None] = mapped_column(String(3), nullable=True)
     invoice_number: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    invoice_date: Mapped[datetime | None] = mapped_column(Date, nullable=True)
-    due_date: Mapped[datetime | None] = mapped_column(Date, nullable=True)
+    invoice_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     supplier_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     supplier_vat: Mapped[str | None] = mapped_column(String(32), nullable=True)
     subtotal: Mapped[float | None] = mapped_column(Numeric(18, 4), nullable=True)

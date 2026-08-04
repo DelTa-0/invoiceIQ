@@ -2,6 +2,7 @@
 See docs/15. The LLM proposes; this engine disposes."""
 
 import re
+from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
@@ -95,8 +96,30 @@ def check_vat_format(vat: str | None) -> Check:
 # --- Arithmetic ------------------------------------------------------------
 
 
+def _rule_check(name: str, status: str, reason: str, evidence: dict) -> Check:
+    return Check(
+        check_name=name,
+        status=status,
+        severity="info" if status == "pass" else ("warning" if status == "warn" else "error"),
+        reason=reason,
+        evidence=evidence,
+    )
+
+
+def _jsonable(value):
+    """Decimal -> str so evidence survives JSON columns (SQLite/Postgres)."""
+    if isinstance(value, Decimal):
+        return str(value)
+    if isinstance(value, dict):
+        return {k: _jsonable(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_jsonable(v) for v in value]
+    return value
+
+
 def check_arithmetic(lines: list[dict], invoice: dict) -> list[Check]:
-    """Run the 7 arithmetic rules. `lines` are extracted line dicts; `invoice`
+    """Run the 7 arithmetic rules, emitting pass/warn/fail for every evaluated
+    rule (not just failures). `lines` are extracted line dicts; `invoice`
     carries subtotal/total_vat/shipping/other/total."""
     checks: list[Check] = []
 
@@ -107,34 +130,52 @@ def check_arithmetic(lines: list[dict], invoice: dict) -> list[Check]:
         line_nets.append(net)
         line_vats.append(vat)
         vat_rates.append(line.get("vat_rate") or 0)
-        expected_gross = arith.line_gross(net, vat)
-        if line.get("gross") is not None and abs(expected_gross - arith.d(line["gross"])) > arith.d("0.01"):
-            checks.append(Check(check_name=f"line_gross_{idx}", status="fail", severity="error",
-                                reason="line_gross_mismatch",
-                                evidence={"position": idx, "expected": str(expected_gross),
-                                          "actual": str(line.get("gross"))}))
+        if line.get("gross") is not None:
+            expected_gross = arith.line_gross(net, vat)
+            ok = abs(expected_gross - arith.d(line["gross"])) <= arith.d("0.01")
+            checks.append(_rule_check(
+                f"line_gross_{idx}",
+                "pass" if ok else "fail",
+                "line_gross_ok" if ok else "line_gross_mismatch",
+                {"position": idx, "expected": str(expected_gross), "actual": str(line.get("gross"))},
+            ))
 
-    if invoice.get("subtotal") is not None and not arith.check_subtotal(line_nets, invoice.get("subtotal")):
-        checks.append(Check(check_name="subtotal", status="fail", severity="error",
-                            reason="subtotal_mismatch",
-                            evidence={"expected": str(sum(line_nets, arith.d("0"))),
-                                      "actual": str(invoice.get("subtotal"))}))
-    if invoice.get("total_vat") is not None and not arith.check_vat_total(line_vats, invoice.get("total_vat")):
-        checks.append(Check(check_name="vat_total", status="fail", severity="error",
-                            reason="vat_total_mismatch",
-                            evidence={"expected": str(sum(line_vats, arith.d("0"))),
-                                      "actual": str(invoice.get("total_vat"))}))
-    if invoice.get("total") is not None and not arith.check_grand_total(
-        invoice.get("subtotal"), invoice.get("total_vat"),
-        invoice.get("shipping"), invoice.get("other"), invoice.get("total"),
-    ):
-        checks.append(Check(check_name="grand_total", status="fail", severity="error",
-                            reason="total_mismatch",
-                            evidence={"invoice": invoice, "lines": len(lines)}))
+    if invoice.get("subtotal") is not None:
+        ok = arith.check_subtotal(line_nets, invoice.get("subtotal"))
+        checks.append(_rule_check(
+            "subtotal",
+            "pass" if ok else "fail",
+            "subtotal_ok" if ok else "subtotal_mismatch",
+            {"expected": str(sum(line_nets, arith.d("0"))), "actual": str(invoice.get("subtotal"))},
+        ))
+    if invoice.get("total_vat") is not None:
+        ok = arith.check_vat_total(line_vats, invoice.get("total_vat"))
+        checks.append(_rule_check(
+            "vat_total",
+            "pass" if ok else "fail",
+            "vat_total_ok" if ok else "vat_total_mismatch",
+            {"expected": str(sum(line_vats, arith.d("0"))), "actual": str(invoice.get("total_vat"))},
+        ))
+    if invoice.get("total") is not None:
+        ok = arith.check_grand_total(
+            invoice.get("subtotal"), invoice.get("total_vat"),
+            invoice.get("shipping"), invoice.get("other"), invoice.get("total"),
+        )
+        checks.append(_rule_check(
+            "grand_total",
+            "pass" if ok else "fail",
+            "total_ok" if ok else "total_mismatch",
+            {"invoice": _jsonable(invoice), "lines": len(lines)},
+        ))
 
-    if arith.is_reverse_charge(vat_rates) and (invoice.get("total_vat") not in (None, 0)):
-        checks.append(Check(check_name="reverse_charge", status="fail", severity="warning",
-                            reason="vat_expected_zero", evidence={"rates": vat_rates}))
+    if arith.is_reverse_charge(vat_rates):
+        vat_zero = invoice.get("total_vat") in (None, 0)
+        checks.append(_rule_check(
+            "reverse_charge",
+            "pass" if vat_zero else "fail",
+            "vat_expected_zero",
+            {"rates": vat_rates},
+        ))
     return checks
 
 

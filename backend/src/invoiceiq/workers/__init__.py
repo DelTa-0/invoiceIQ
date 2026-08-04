@@ -1,4 +1,19 @@
 from .app import celery_app
-from .tasks import finalize, ingest, run_pipeline
+from .tasks import (
+    confidence,
+    extract,
+    finalize,
+    ingest,
+    run_pipeline,
+    validate,
+)
 
-__all__ = ["celery_app", "finalize", "ingest", "run_pipeline"]
+__all__ = [
+    "celery_app",
+    "confidence",
+    "extract",
+    "finalize",
+    "ingest",
+    "run_pipeline",
+    "validate",
+]
