@@ -23,7 +23,7 @@ from .base import OCRNoTextError, OCRPage, PageBlock
 
 logger = logging.getLogger(__name__)
 
-_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp"}
+_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp", ".heic"}
 _MIN_DPI = 200.0
 _TARGET_DPI = 300.0
 

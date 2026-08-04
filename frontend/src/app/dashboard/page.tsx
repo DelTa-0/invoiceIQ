@@ -70,8 +70,8 @@ export default function DashboardPage() {
       </header>
 
       <label className="flex cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-black/15 px-6 py-10 text-sm text-zinc-500 transition-colors hover:border-black/30 dark:border-white/20 dark:hover:border-white/40">
-        {uploading ? "Uploading…" : "Drop a PDF here or click to upload"}
-        <input type="file" accept=".pdf,application/pdf" className="hidden" onChange={onUpload} disabled={uploading} />
+        {uploading ? "Uploading…" : "Drop a PDF or image here or click to upload"}
+        <input type="file" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp,application/pdf,image/*" className="hidden" onChange={onUpload} disabled={uploading} />
       </label>
 
       {error && <p className="text-sm text-red-600">{error}</p>}

@@ -19,7 +19,7 @@ from ..deps import Principal, get_principal
 
 router = APIRouter(prefix="/v1", tags=["invoices"])
 
-ALLOWED_SUFFIXES = {".pdf", ".png", ".jpg", ".jpeg", ".webp", ".heic", ".zip"}
+ALLOWED_SUFFIXES = {".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp", ".heic", ".zip"}
 
 
 class UploadResult(BaseModel):
