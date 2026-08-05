@@ -302,6 +302,19 @@ class Export(Base, TimestampMixin):
     created_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("users.id"), nullable=True)
 
 
+class ExtractionTemplate(Base, TimestampMixin):
+    __tablename__ = "extraction_templates"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_uuid)
+    org_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("organizations.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(Text)
+    doc_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    fields: Mapped[list] = mapped_column(JsonType, default=list)
+    validation_rules: Mapped[list] = mapped_column(JsonType, default=list)
+    export_mapping: Mapped[dict] = mapped_column(JsonType, default=dict)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("users.id"), nullable=True)
+
+
 class UsageEvent(Base):
     __tablename__ = "usage_events"
 
