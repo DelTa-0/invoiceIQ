@@ -19,6 +19,42 @@ export type Invoice = {
   created_at: string;
 };
 
+export type SessionStatus = "draft" | "active" | "processing" | "completed" | "archived";
+
+export type Session = {
+  id: string;
+  org_id: string;
+  name: string;
+  description: string | null;
+  status: SessionStatus;
+  requested_fields: Array<{ name: string; type: string; description: string }>;
+  result_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ExtractionField = {
+  field_name: string;
+  field_value: Record<string, unknown> | null;
+  confidence: number | null;
+  page: number | null;
+  source_text: string | null;
+  validation_status: string | null;
+};
+
+export type SearchQuery = {
+  query: string;
+  org_id: string;
+};
+
+export type SearchResult = {
+  field_name: string;
+  field_value: Record<string, unknown> | null;
+  confidence: number | null;
+  source_text: string | null;
+  validation_status: string | null;
+};
+
 const TOKEN_KEY = "invoiceiq_access_token";
 const ORG_KEY = "invoiceiq_org_id";
 
@@ -108,4 +144,42 @@ export function uploadInvoice(file: File): Promise<Invoice[]> {
   const form = new FormData();
   form.append("files", file);
   return request("/v1/invoices", { method: "POST", body: form });
+}
+
+export function listSessions(orgId: string): Promise<Session[]> {
+  return request(`/v1/sessions?org_id=${orgId}`);
+}
+
+export function createSession(payload: {
+  name: string;
+  description?: string;
+  requested_fields: Array<{ name: string; type?: string; description?: string }>;
+}): Promise<Session> {
+  return request("/v1/sessions", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function getSession(sessionId: string): Promise<Session> {
+  return request(`/v1/sessions/${sessionId}`);
+}
+
+export function rerunSession(sessionId: string): Promise<Session> {
+  return request(`/v1/sessions/${sessionId}/rerun`, { method: "POST" });
+}
+
+export function uploadToSession(sessionId: string, file: File): Promise<Invoice[]> {
+  const form = new FormData();
+  form.append("files", file);
+  return request(`/v1/sessions/${sessionId}/upload`, { method: "POST", body: form });
+}
+
+export function getExtractionResults(sessionId: string): Promise<ExtractionField[]> {
+  return request(`/v1/sessions/${sessionId}/results`);
+}
+
+export function searchExtractions(query: SearchQuery): Promise<SearchResult[]> {
+  return request("/v1/search", { method: "POST", body: JSON.stringify(query) });
+}
+
+export function exportResults(sessionId: string, format: string, config?: Record<string, unknown>): Promise<{ id: string; status: string }> {
+  return request(`/v1/sessions/${sessionId}/export`, { method: "POST", body: JSON.stringify({ format, ...config }) });
 }
