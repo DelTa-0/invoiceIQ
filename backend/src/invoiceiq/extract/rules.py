@@ -16,9 +16,12 @@ from __future__ import annotations
 import re
 from datetime import date
 
+from ..classification import DocumentClassifier
 from ..ocr import OCRPage, PageBlock, TableCell
 from ..validate.engine import VAT_PATTERNS, check_iban
 from .schema import BBox, FieldCandidate, LineItemCandidate
+
+_classifier = DocumentClassifier()
 
 # ---------------------------------------------------------------------------
 # Value envelope helpers
@@ -153,21 +156,6 @@ def _amounts_in(text: str) -> list[tuple[float, str]]:
 # Document-level classification & language
 # ---------------------------------------------------------------------------
 
-INVOICE_KW = ("rechnung", "invoice", "faktura", "facture", "fattura", "factuur", "fatura")
-CREDIT_KW = (
-    "gutschrift",
-    "credit note",
-    "creditnote",
-    "credit memo",
-    "avoir",
-    "nota de credito",
-    "nota de crédito",
-    "nota di credito",
-    "creditnota",
-    "kreditnota",
-)
-PROFORMA_KW = ("proforma", "pro-forma", "pro forma", "vorabrechnung")
-
 LANG_KEYWORDS: dict[str, tuple[str, ...]] = {
     "de": (
         "rechnung", "zwischensumme", "gesamtbetrag", "mehrwertsteuer", "mwst", "mws", "ust",
@@ -200,14 +188,8 @@ COUNTRY_BY_LANG = {"de": "DE", "en": "GB", "fr": "FR", "it": "IT", "es": "ES", "
 
 
 def classify_doc_type(text: str) -> tuple[str | None, float]:
-    low = text.lower()
-    if any(k in low for k in PROFORMA_KW):
-        return "proforma", 0.9
-    if any(k in low for k in CREDIT_KW):
-        return "credit_note", 0.9
-    if any(k in low for k in INVOICE_KW):
-        return "invoice", 0.9
-    return "other", 0.5
+    result = _classifier.classify(text)
+    return result.doc_type.value if result.doc_type else None, result.confidence
 
 
 def detect_language(text: str) -> tuple[str | None, float]:
